@@ -16,7 +16,6 @@ meili_data/
 meilisearch/
 
 # Graphify (entire pipeline)
-docs/
 graphify-out/
 .graphify_*.json
 .graphify_uncached.txt
@@ -31,3 +30,4 @@ _merge_sem.py
 
 # Misc
 check_meili.py
+sample.json
