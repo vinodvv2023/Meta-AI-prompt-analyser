@@ -109,7 +109,33 @@ function parseMjPrompt(rawText) {
     parsedFlags.unshift({ name: '--sref', value: orphanedNums.join(' ') })
   }
 
-  // ── Step 6: Build flag strings ───────────────────────────────────────────
+  // ── Step 6: Sort flags into canonical MJ order ──────────────────────────
+  const FLAG_ORDER = {
+    '--ar':      0,
+    '--raw':     1,
+    '--chaos':   2,
+    '--stylize': 3,
+    '--profile': 4,
+    '--p':       4,
+    '--sref':    5,
+    '--niji':    6,
+  }
+  const OTHER_FALLBACK = 7
+
+  function flagSortKey(f) {
+    const base = f.name.split(/\s/)[0]
+    if (base === '--niji' && f.value) {
+      const v = parseFloat(f.value)
+      if (v >= 8.1) return 6.4
+      if (v >= 8)   return 6.3
+      if (v >= 7)   return 6.2
+      if (v >= 6)   return 6.1
+    }
+    return FLAG_ORDER[base] ?? OTHER_FALLBACK
+  }
+
+  parsedFlags.sort((a, b) => flagSortKey(a) - flagSortKey(b))
+
   const flagStrings = parsedFlags.map(f => f.value ? `${f.name} ${f.value}` : f.name)
 
   return { prompt: cleanPrompt, flags: flagStrings }

@@ -10,7 +10,7 @@ const TYPE_ICON = {
 
 function buildApiParams(filterId, activeTags) {
   let params = ''
-  if (filterId === 'mj')       params += '&favorite=false'
+  if (filterId === 'mj')       params += '&mj=true'
   if (filterId === 'failed')   params += '&failed=true'
   if (filterId === 'favorites') params += '&favorite=true'
   if (filterId && filterId !== 'all' && filterId !== 'mj' && filterId !== 'failed' && filterId !== 'favorites') {

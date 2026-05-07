@@ -177,6 +177,10 @@ async def get_tree(
     index = client.get_index(INDEX_NAME)
 
     filter_str = _build_filter(type, mj, failed, None, None, favorite, tags)
+    if filter_str:
+        filter_str = f'(type != "media") AND ({filter_str})'
+    else:
+        filter_str = 'type != "media"'
 
     all_docs = []
     offset = 0

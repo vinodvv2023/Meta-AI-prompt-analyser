@@ -7,6 +7,7 @@ const CATEGORY_LABELS = {
   color_palette: 'Color Palette',
   environment: 'Environment',
   artist_reference: 'Artist / Reference',
+  midjourney: 'MidJourney',
 }
 
 const CATEGORY_ICONS = {
@@ -16,6 +17,7 @@ const CATEGORY_ICONS = {
   color_palette: '🌈',
   environment: '🌿',
   artist_reference: '🖼',
+  midjourney: '🎯',
 }
 
 const INITIAL_SHOWN = 8

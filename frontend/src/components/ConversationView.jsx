@@ -153,7 +153,11 @@ export default function ConversationView({ id }) {
         <div className="conv-aspects">
           <div className="aspects-title">MidJourney Flags</div>
           <div className="aspect-chips" style={{ paddingTop: 4 }}>
-            {doc.mj_flags.map((f, i) => (
+            {[...doc.mj_flags].sort((a, b) => {
+              const order = {'--ar':0,'--raw':1,'--chaos':2,'--stylize':3,'--profile':4,'--p':4,'--sref':5,'--niji':6}
+              const ka = a.split(/\s/)[0], kb = b.split(/\s/)[0]
+              return (order[ka]??7) - (order[kb]??7)
+            }).map((f, i) => (
               <span key={i} className="flag-chip">{f}</span>
             ))}
           </div>

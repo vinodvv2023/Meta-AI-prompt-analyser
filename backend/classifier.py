@@ -438,6 +438,16 @@ def extract_detected_categories(text: str) -> Dict[str, List[str]]:
     return categories
 
 
+def extract_detected_categories_with_mj(text: str, mj_flags: List[str]) -> Dict[str, List[str]]:
+    """Like extract_detected_categories but also adds a midjourney category for detected flags."""
+    categories = extract_detected_categories(text)
+
+    if mj_flags:
+        categories["midjourney"] = mj_flags
+
+    return categories
+
+
 def flatten_categories(categories: Dict[str, List[str]]) -> List[str]:
     """Flatten category map into a deduplicated tags list."""
     seen = set()
@@ -485,7 +495,7 @@ def classify_document(doc: Dict[str, Any]) -> Dict[str, Any]:
 
     if conv_type in ("image_prompt", "video_prompt", "both"):
         aspects = extract_aspects(user_prompts)
-        detected_categories = extract_detected_categories(user_prompts)
+        detected_categories = extract_detected_categories_with_mj(user_prompts, mj_flags)
         auto_tags = flatten_categories(detected_categories)
         custom_tags = doc.get("custom_tags", [])
         tags = auto_tags + [t for t in custom_tags if t not in auto_tags]
