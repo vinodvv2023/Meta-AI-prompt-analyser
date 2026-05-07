@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Environment / secrets
+.env
+
+# Meilisearch
+meili_data/
+meilisearch/
+
+# Graphify (entire pipeline)
+docs/
+graphify-out/
+.graphify_*.json
+.graphify_uncached.txt
+_benchmark.py
+_build_graph.py
+_finalize.py
+_fix_json.py
+_gen_html.py
+_label_communities.py
+_merge_final.py
+_merge_sem.py
+
+# Misc
+check_meili.py
