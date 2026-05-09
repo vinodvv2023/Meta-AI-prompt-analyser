@@ -35,6 +35,9 @@ export default function StatsBar() {
   const f = stats.facets || {}
   const types = f.type || {}
   const total = stats.total_documents || 0
+  const srcFacets = f.source_file || {}
+  const metaCount = srcFacets['prompts.json'] || 0
+  const grokCount = srcFacets['prod-grok-backend.json'] || 0
 
   const items = [
     { label: 'Total',  val: total,                       color: 'var(--clr-brand)' },
@@ -42,6 +45,8 @@ export default function StatsBar() {
     { label: 'Video',  val: types.video_prompt || 0,     color: 'var(--clr-video)' },
     { label: 'Both',   val: types.both || 0,             color: 'var(--clr-both)' },
     { label: 'Failed', val: (f.llm_failed || {})['true'] || 0, color: 'var(--clr-failed)' },
+    ...(metaCount > 0 ? [{ label: 'Meta AI', val: metaCount, color: 'var(--clr-convo)' }] : []),
+    ...(grokCount > 0 ? [{ label: 'Grok', val: grokCount, color: '#f97316' }] : []),
   ]
 
   return (

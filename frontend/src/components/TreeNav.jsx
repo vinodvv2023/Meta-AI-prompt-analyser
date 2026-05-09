@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { sourceToValue } from './FilterBar'
 
 const TYPE_ICON = {
   image_prompt: '🖼',
@@ -8,7 +9,12 @@ const TYPE_ICON = {
   media:        '📎',
 }
 
-function buildApiParams(filterId, activeTags) {
+const SOURCE_ICON = {
+  'prompts.json': '🟦',
+  'prod-grok-backend.json': '🟧',
+}
+
+function buildApiParams(filterId, activeTags, sourceId) {
   let params = ''
   if (filterId === 'mj')       params += '&mj=true'
   if (filterId === 'failed')   params += '&failed=true'
@@ -19,10 +25,14 @@ function buildApiParams(filterId, activeTags) {
   if (activeTags && activeTags.length > 0) {
     params += `&tags=${encodeURIComponent(activeTags.join(','))}`
   }
+  const srcVal = sourceToValue(sourceId || 'all')
+  if (srcVal) {
+    params += `&source=${encodeURIComponent(srcVal)}`
+  }
   return params
 }
 
-export default function TreeNav({ activeFilter, selectedId, onSelect, activeTags }) {
+export default function TreeNav({ activeFilter, activeSource, selectedId, onSelect, activeTags }) {
   const [tree, setTree] = useState({})
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState({})
@@ -30,12 +40,12 @@ export default function TreeNav({ activeFilter, selectedId, onSelect, activeTags
 
   useEffect(() => {
     setLoading(true)
-    const params = buildApiParams(activeFilter, activeTags)
+    const params = buildApiParams(activeFilter, activeTags, activeSource)
     fetch(`/api/tree?${params}`)
       .then(r => r.json())
       .then(data => { setTree(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [activeFilter, activeTags])
+  }, [activeFilter, activeTags, activeSource])
 
   const toggleDate = (date) =>
     setCollapsed(prev => ({ ...prev, [date]: !prev[date] }))
@@ -119,6 +129,11 @@ export default function TreeNav({ activeFilter, selectedId, onSelect, activeTags
                         )}
                         {item.llm_failed && (
                           <span className="badge badge-failed">Failed</span>
+                        )}
+                        {item.source_file && (
+                          <span className="badge badge-source">
+                            {SOURCE_ICON[item.source_file] || '📄'}
+                          </span>
                         )}
                       </div>
                     </div>

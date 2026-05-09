@@ -10,6 +10,7 @@ import KeywordExplorer from './components/KeywordExplorer'
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
+  const [activeSource, setActiveSource] = useState('all')
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [activeTags, setActiveTags] = useState([])
 
@@ -39,7 +40,7 @@ export default function App() {
         <div className="header-brand">
           <span className="brand-icon">🔮</span>
           <span className="brand-title">Prompt Explorer</span>
-          <span className="brand-sub">Meta AI</span>
+          <span className="brand-sub">Prompt Library</span>
         </div>
         <div className="header-search">
           <SearchBar value={searchQuery} onChange={handleSearch} />
@@ -48,7 +49,7 @@ export default function App() {
       </header>
 
       {/* ── Filter Bar ────────────────────────────── */}
-      <FilterBar active={activeFilter} onChange={setActiveFilter} />
+      <FilterBar active={activeFilter} onChange={setActiveFilter} source={activeSource} onSourceChange={setActiveSource} />
 
       {/* ── Keyword Explorer ─────────────────────── */}
       <KeywordExplorer activeTags={activeTags} onToggleTag={handleToggleTag} />
@@ -59,6 +60,7 @@ export default function App() {
         <aside className="app-sidebar">
           <TreeNav
             activeFilter={activeFilter}
+            activeSource={activeSource}
             selectedId={selectedConvId}
             onSelect={setSelectedConvId}
             activeTags={activeTags}
@@ -71,6 +73,7 @@ export default function App() {
             <SearchResults
               query={searchQuery}
               filter={activeFilter}
+              activeSource={activeSource}
               onSelectConv={handleSelectFromSearch}
               activeTags={activeTags}
             />

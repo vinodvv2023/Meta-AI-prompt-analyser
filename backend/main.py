@@ -100,6 +100,7 @@ def _build_filter(
     date: Optional[str],
     favorite: Optional[bool],
     tags: Optional[str],
+    source: Optional[str],
 ) -> Optional[str]:
     parts = []
     if type_:
@@ -118,6 +119,8 @@ def _build_filter(
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
         for tag in tag_list:
             parts.append(f'tags = "{tag}"')
+    if source:
+        parts.append(f'source_file = "{source}"')
     return " AND ".join(parts) if parts else None
 
 
@@ -131,13 +134,14 @@ async def search(
     date: Optional[str] = Query(default=None),
     favorite: Optional[bool] = Query(default=None),
     tags: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
     limit: int = Query(default=20, le=100),
     offset: int = Query(default=0),
 ):
     client = get_client()
     index = client.get_index(INDEX_NAME)
 
-    filter_str = _build_filter(type, mj, failed, has_video, date, favorite, tags)
+    filter_str = _build_filter(type, mj, failed, has_video, date, favorite, tags, source)
 
     params = {
         "limit": limit,
@@ -145,7 +149,7 @@ async def search(
         "attributesToHighlight": ["all_user_prompts", "all_ai_responses", "label"],
         "highlightPreTag": "<mark>",
         "highlightPostTag": "</mark>",
-        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite"],
+        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "source_file"],
     }
     if filter_str:
         params["filter"] = filter_str
@@ -171,12 +175,13 @@ async def get_tree(
     failed: Optional[bool] = Query(default=None),
     favorite: Optional[bool] = Query(default=None),
     tags: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
 ):
     """Return tree metadata for the left nav: { date: [{ id, label, type, ... }] }"""
     client = get_client()
     index = client.get_index(INDEX_NAME)
 
-    filter_str = _build_filter(type, mj, failed, None, None, favorite, tags)
+    filter_str = _build_filter(type, mj, failed, None, None, favorite, tags, source)
     if filter_str:
         filter_str = f'(type != "media") AND ({filter_str})'
     else:
@@ -186,7 +191,7 @@ async def get_tree(
     offset = 0
     batch = 1000
     fields = ["id", "date", "label", "type", "is_midjourney_style", "has_video",
-              "llm_failed", "all_user_prompts", "is_favorite"]
+               "llm_failed", "all_user_prompts", "is_favorite", "source_file"]
 
     while True:
         params: dict = {"limit": batch, "offset": offset, "fields": fields}
@@ -214,6 +219,7 @@ async def get_tree(
             "has_video": d.get("has_video", False),
             "llm_failed": d.get("llm_failed", False),
             "is_favorite": d.get("is_favorite", False),
+            "source_file": d.get("source_file", ""),
             "preview": preview,
         })
 
@@ -245,7 +251,7 @@ async def get_stats():
 
     stats = index.get_stats()
     facet_result = index.search("", {
-        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite"],
+        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "source_file"],
         "limit": 0,
     })
     return {

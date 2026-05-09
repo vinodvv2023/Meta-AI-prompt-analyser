@@ -74,6 +74,9 @@ export default function ConversationView({ id }) {
   const aspects = doc.image_aspects || {}
   const hasAspects = Object.keys(aspects).length > 0
 
+  const aiName = (doc.source_file || '').includes('grok') ? 'Grok' : 'Meta AI'
+  const isGrok = aiName === 'Grok'
+
   const hasImageContent = allImageText.length > 0
   const hasVideoContent = allVideoText.length > 0
 
@@ -85,6 +88,7 @@ export default function ConversationView({ id }) {
         <div className="conv-meta">
           {doc.date && <span className="conv-date">📅 {doc.date}</span>}
           <span className={`badge ${typeMeta.cls}`}>{typeMeta.label}</span>
+          <span className="badge badge-source-label">{aiName}</span>
           {doc.is_midjourney_style && (
             <span className="badge badge-mj">🎯 MidJourney Style</span>
           )}
@@ -185,6 +189,7 @@ export default function ConversationView({ id }) {
               convType={doc.type}
               isMj={doc.is_midjourney_style}
               mjFlags={doc.mj_flags}
+              aiName={aiName}
             />
           ))}
         </div>

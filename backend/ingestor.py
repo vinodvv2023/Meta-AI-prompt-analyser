@@ -14,6 +14,7 @@ from watchdog.events import FileSystemEventHandler
 from dotenv import load_dotenv
 
 from parser import parse_json_file
+from grok_parser import parse_grok_file
 from classifier import classify_document
 
 load_dotenv()
@@ -109,7 +110,11 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
     logger.info(f"📂 Ingesting: {filepath}")
 
     try:
-        documents = parse_json_file(filepath)
+        fname = Path(filepath).name.lower()
+        if "grok" in fname:
+            documents = parse_grok_file(filepath)
+        else:
+            documents = parse_json_file(filepath)
     except Exception as exc:
         logger.error(f"Parse error for {filepath}: {exc}")
         return 0

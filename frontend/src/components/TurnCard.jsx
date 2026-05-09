@@ -183,7 +183,7 @@ const FLAG_DETECT_RE = /--[a-z]/i
 /**
  * Render one turn in the conversation timeline.
  */
-export default function TurnCard({ turn, convType, isMj, mjFlags }) {
+export default function TurnCard({ turn, convType, isMj, mjFlags, aiName = 'Meta AI' }) {
   const isYou = turn.speaker === 'You'
 
   // Parse MJ flags only for "You" turns in MJ conversations
@@ -211,7 +211,7 @@ export default function TurnCard({ turn, convType, isMj, mjFlags }) {
         <div className={`speaker-avatar ${isYou ? 'avatar-you' : 'avatar-metaai'}`}>
           {isYou ? '🧑' : '🤖'}
         </div>
-        <span className="speaker-name">{isYou ? 'You' : 'Meta AI'}</span>
+        <span className="speaker-name">{isYou ? 'You' : aiName}</span>
         <span className="turn-idx">#{turn.turn_index}</span>
 
         {isYou && (

@@ -158,6 +158,18 @@ mark {
 .filter-btn.f-convo.active   { color: var(--clr-convo); }
 .filter-btn.f-mj.active      { color: var(--clr-mj); }
 .filter-btn.f-failed.active  { color: var(--clr-failed); }
+.filter-btn.f-source.active  { color: var(--clr-brand); }
+.filter-bar-type, .filter-bar-source {
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0;
+}
+.source-divider {
+  color: var(--border-light);
+  font-size: 18px;
+  margin: 0 4px;
+  user-select: none;
+}
+.badge-source { font-size: 10px; padding: 0 4px; border-radius: 99px; background: rgba(255,255,255,0.06); }
 .filter-count {
   background: rgba(255,255,255,0.08);
   border-radius: 99px;

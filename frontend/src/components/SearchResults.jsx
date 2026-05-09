@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useDebounce } from '../hooks/useDebounce'
-import { filterToParams } from './FilterBar'
+import { filterToParams, sourceToValue } from './FilterBar'
 
 const TYPE_COLOR = {
   image_prompt: 'var(--clr-image)',
@@ -26,7 +26,7 @@ const TYPE_LABELS = {
   media:        'Media',
 }
 
-function buildQueryString(q, filterId, offset, limit, activeTags) {
+function buildQueryString(q, filterId, offset, limit, activeTags, sourceId) {
   const params = new URLSearchParams({ q, limit, offset })
   const fp = filterToParams(filterId)
   if (fp) {
@@ -38,10 +38,14 @@ function buildQueryString(q, filterId, offset, limit, activeTags) {
   if (activeTags && activeTags.length > 0) {
     params.set('tags', activeTags.join(','))
   }
+  const srcVal = sourceToValue(sourceId || 'all')
+  if (srcVal) {
+    params.set('source', srcVal)
+  }
   return params.toString()
 }
 
-export default function SearchResults({ query, filter, onSelectConv, activeTags }) {
+export default function SearchResults({ query, filter, activeSource, onSelectConv, activeTags }) {
   const debouncedQ = useDebounce(query, 220)
   const [hits, setHits] = useState([])
   const [total, setTotal] = useState(0)
@@ -54,7 +58,7 @@ export default function SearchResults({ query, filter, onSelectConv, activeTags 
   const fetchResults = useCallback((q, f, off, append = false, tgs) => {
     setLoading(true)
     setError(null)
-    const qs = buildQueryString(q, f, off, LIMIT, tgs)
+    const qs = buildQueryString(q, f, off, LIMIT, tgs, activeSource)
     fetch(`/api/search?${qs}`)
       .then(r => {
         if (!r.ok) throw new Error(`Server error (${r.status})`)
@@ -70,13 +74,13 @@ export default function SearchResults({ query, filter, onSelectConv, activeTags 
         setError(err.message)
         setLoading(false)
       })
-  }, [])
+  }, [activeSource])
 
   // Reset + re-fetch when query or filter changes
   useEffect(() => {
     setOffset(0)
     fetchResults(debouncedQ, filter, 0, false)
-  }, [debouncedQ, filter, activeTags, fetchResults])
+  }, [debouncedQ, filter, activeTags, activeSource, fetchResults])
 
   const loadMore = () => {
     const newOffset = offset + LIMIT
