@@ -1,5 +1,9 @@
 # Meta AI Prompt Analyser
 
+This repo is for prompters who have generated images and videos using Meta AI app, you can download the JSON import into this app and explore your prompts. It helps you visualize.
+
+Meta AI app -> Settings -> Data and privacy -> Manage your information -> Download your information.
+
 A local-first web application for parsing, classifying, searching, and browsing your **Meta AI conversation exports**. Drop your exported JSON file into the `source/` folder and the app automatically ingests, classifies every conversation (image prompts, video prompts, Midjourney-style prompts, or plain chat), and makes them fully searchable with filters, keyword tagging, and favorites.
 
 ## Features
