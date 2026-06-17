@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "skills": {
+    "paths": [
+      ".opencode/skills"
+    ]
+  },
+  "mcp": {
+    "threads-prompts": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["-m", "threads_service.mcp_server"],
+      "cwd": "backend",
+      "env": {
+        "THREADS_API_URL": "http://localhost:8002",
+        "THREADS_DB_PATHS": "C:\\Users\\xtrem\\Downloads\\python_proj\\threads\\docs\\docs\\prompts_backup\\prompts.db|C:\\Users\\xtrem\\Downloads\\python_proj\\threads\\data\\prompts.db"
+      }
+    }
+  }
+}

@@ -13,8 +13,9 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from dotenv import load_dotenv
 
-from parser import parse_json_file
+from parser import parse_json_file, parse_user_prompts_file
 from grok_parser import parse_grok_file
+from threads_parser import parse_threads_file
 from classifier import classify_document
 
 load_dotenv()
@@ -72,6 +73,7 @@ def setup_index(client: meilisearch.Client) -> meilisearch.index.Index:
             "label",
             "tags",
             "custom_tags",
+            "thread_url",
         ],
         "filterableAttributes": [
             "type",
@@ -81,8 +83,12 @@ def setup_index(client: meilisearch.Client) -> meilisearch.index.Index:
             "has_video",
             "source_file",
             "is_favorite",
+            "is_xx",
+            "is_xxx",
             "tags",
             "custom_tags",
+            "child_group_label",
+            "thread_user_id",
         ],
         "sortableAttributes": ["date"],
         "rankingRules": [
@@ -111,8 +117,12 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
 
     try:
         fname = Path(filepath).name.lower()
-        if "grok" in fname:
+        if "user-prompts" in fname:
+            documents = parse_user_prompts_file(filepath)
+        elif "grok" in fname:
             documents = parse_grok_file(filepath)
+        elif "thread" in fname:
+            documents = parse_threads_file(filepath)
         else:
             documents = parse_json_file(filepath)
     except Exception as exc:
@@ -134,7 +144,7 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
         if ids:
             for i in range(0, len(ids), 1000):
                 batch_ids = ids[i:i+1000]
-                results = index.get_documents({"filter": None, "fields": ["id", "custom_tags", "is_favorite"], "limit": 1000})
+                results = index.get_documents({"filter": None, "fields": ["id", "custom_tags", "is_favorite", "is_xx", "is_xxx"], "limit": 1000})
                 for r in results.results:
                     rd = r if isinstance(r, dict) else dict(r)
                     existing_docs[rd.get("id")] = rd
@@ -147,12 +157,19 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
             existing = existing_docs[doc_id]
             d["custom_tags"] = existing.get("custom_tags", []) or []
             d["is_favorite"] = existing.get("is_favorite", False)
+            d["is_xx"] = existing.get("is_xx", False)
+            d["is_xxx"] = existing.get("is_xxx", False)
 
     batch_size = 500
     total = 0
     for i in range(0, len(classified), batch_size):
         batch = classified[i : i + batch_size]
-        index.add_documents(batch)
+        task = index.add_documents(batch)
+        task_uid = task.task_uid if hasattr(task, "task_uid") else task.uid
+        try:
+            client.wait_for_task(task_uid, timeout_in_ms=10_000)
+        except Exception as e:
+            logger.warning(f"Timeout waiting for indexing task {task_uid}: {e}")
         total += len(batch)
         logger.info(f"  → Indexed {total}/{len(classified)} documents")
 

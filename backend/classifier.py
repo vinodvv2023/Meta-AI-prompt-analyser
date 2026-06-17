@@ -467,6 +467,8 @@ def classify_document(doc: Dict[str, Any]) -> Dict[str, Any]:
         doc.setdefault("tags", [])
         doc.setdefault("custom_tags", [])
         doc.setdefault("is_favorite", False)
+        doc.setdefault("is_xx", False)
+        doc.setdefault("is_xxx", False)
         return doc
 
     user_prompts = doc.get("all_user_prompts", "")
@@ -475,10 +477,13 @@ def classify_document(doc: Dict[str, Any]) -> Dict[str, Any]:
     mj_flags = detect_mj_flags(user_prompts)
     is_mj = len(mj_flags) >= 2
 
-    has_video = detect_video_intent(user_prompts, ai_responses)
-    has_image = detect_image_intent(user_prompts, mj_flags)
+    existing_type = doc.get("type")
+    has_video = detect_video_intent(user_prompts, ai_responses) or (existing_type in ("video_prompt", "both"))
+    has_image = detect_image_intent(user_prompts, mj_flags) or (existing_type in ("image_prompt", "both"))
 
-    if has_image and has_video:
+    if existing_type in ("both", "image_prompt", "video_prompt"):
+        conv_type = existing_type
+    elif has_image and has_video:
         conv_type = "both"
     elif has_video:
         conv_type = "video_prompt"
@@ -511,6 +516,8 @@ def classify_document(doc: Dict[str, Any]) -> Dict[str, Any]:
         "tags": tags,
         "custom_tags": doc.get("custom_tags", []),
         "is_favorite": doc.get("is_favorite", False),
+        "is_xx": doc.get("is_xx", False),
+        "is_xxx": doc.get("is_xxx", False),
     })
 
     return doc

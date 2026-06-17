@@ -6,6 +6,7 @@ import ConversationView from './components/ConversationView'
 import SearchResults from './components/SearchResults'
 import StatsBar from './components/StatsBar'
 import KeywordExplorer from './components/KeywordExplorer'
+import AddPromptModal from './components/AddPromptModal'
 
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -13,6 +14,8 @@ export default function App() {
   const [activeSource, setActiveSource] = useState('all')
   const [selectedConvId, setSelectedConvId] = useState(null)
   const [activeTags, setActiveTags] = useState([])
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const isSearching = searchQuery.trim().length > 0
 
@@ -33,6 +36,13 @@ export default function App() {
     )
   }, [])
 
+  const handlePromptAdded = useCallback((newPrompt) => {
+    setRefreshTrigger(prev => prev + 1)
+    if (newPrompt && newPrompt.id) {
+      setSelectedConvId(newPrompt.id)
+    }
+  }, [])
+
   return (
     <div className="app">
       {/* ── Header ────────────────────────────────── */}
@@ -45,7 +55,10 @@ export default function App() {
         <div className="header-search">
           <SearchBar value={searchQuery} onChange={handleSearch} />
         </div>
-        <StatsBar />
+        <button className="add-prompt-btn" onClick={() => setIsAddModalOpen(true)}>
+          ➕ Add Prompt
+        </button>
+        <StatsBar refreshTrigger={refreshTrigger} onRefresh={() => setRefreshTrigger(prev => prev + 1)} />
       </header>
 
       {/* ── Filter Bar ────────────────────────────── */}
@@ -64,6 +77,7 @@ export default function App() {
             selectedId={selectedConvId}
             onSelect={setSelectedConvId}
             activeTags={activeTags}
+            refreshTrigger={refreshTrigger}
           />
         </aside>
 
@@ -78,7 +92,10 @@ export default function App() {
               activeTags={activeTags}
             />
           ) : selectedConvId ? (
-            <ConversationView id={selectedConvId} />
+            <ConversationView id={selectedConvId} onDelete={() => {
+              setSelectedConvId(null)
+              setRefreshTrigger(prev => prev + 1)
+            }} />
           ) : (
             <div className="empty-state">
               <div className="empty-icon">🔮</div>
@@ -91,6 +108,13 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {isAddModalOpen && (
+        <AddPromptModal
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={handlePromptAdded}
+        />
+      )}
     </div>
   )
 }

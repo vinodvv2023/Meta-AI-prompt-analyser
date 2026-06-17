@@ -9,12 +9,16 @@ const TYPE_FILTERS = [
   { id: 'mj',           label: 'MidJourney',   icon: '🎯',  cls: 'f-mj',   param: { mj: true } },
   { id: 'failed',       label: 'LLM Failed',   icon: '❌',  cls: 'f-failed',param: { failed: true } },
   { id: 'favorites',    label: 'Favorites',    icon: '★',  cls: 'f-fav',   param: { favorite: true } },
+  { id: 'xx',           label: 'XX',           icon: '📁',  cls: 'f-xx',    param: { xx: true } },
+  { id: 'xxx',          label: 'XXX',          icon: '📁',  cls: 'f-xxx',   param: { xxx: true } },
 ]
 
 const SOURCE_FILTERS = [
   { id: 'all',     label: 'All Sources', value: null },
   { id: 'meta',    label: 'Meta AI',     value: 'prompts.json' },
   { id: 'grok',    label: 'Grok',        value: 'prod-grok-backend.json' },
+  { id: 'threads', label: 'Threads',     value: 'threads-prompts.json' },
+  { id: 'user',    label: 'User-Prompt', value: 'user-prompts.json' },
 ]
 
 export default function FilterBar({ active, onChange, source, onSourceChange, facets }) {
@@ -25,10 +29,12 @@ export default function FilterBar({ active, onChange, source, onSourceChange, fa
     counts.video_prompt = t.video_prompt || 0
     counts.both         = t.both || 0
     counts.conversation = t.conversation || 0
-  counts.mj     = (facets.is_midjourney_style || {})['true'] || 0
-  counts.failed = (facets.llm_failed || {})['true'] || 0
-  counts.favorites = (facets.is_favorite || {})['true'] || 0
-  counts.all    = Object.values(t).reduce((s, v) => s + v, 0)
+    counts.mj     = (facets.is_midjourney_style || {})['true'] || 0
+    counts.failed = (facets.llm_failed || {})['true'] || 0
+    counts.favorites = (facets.is_favorite || {})['true'] || 0
+    counts.xx     = (facets.is_xx || {})['true'] || 0
+    counts.xxx    = (facets.is_xxx || {})['true'] || 0
+    counts.all    = Object.values(t).reduce((s, v) => s + v, 0)
   }
 
   const srcFacet = facets?.source_file || {}
@@ -36,6 +42,8 @@ export default function FilterBar({ active, onChange, source, onSourceChange, fa
     all:  Object.values(srcFacet).reduce((s, v) => s + v, 0),
     meta: srcFacet['prompts.json'] || 0,
     grok: srcFacet['prod-grok-backend.json'] || 0,
+    threads: srcFacet['threads-prompts.json'] || 0,
+    user: srcFacet['user-prompts.json'] || 0,
   }
 
   return (

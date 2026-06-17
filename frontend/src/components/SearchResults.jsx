@@ -34,6 +34,8 @@ function buildQueryString(q, filterId, offset, limit, activeTags, sourceId) {
     if (fp.mj)       params.set('mj', 'true')
     if (fp.failed)   params.set('failed', 'true')
     if (fp.favorite) params.set('favorite', 'true')
+    if (fp.xx)       params.set('xx', 'true')
+    if (fp.xxx)      params.set('xxx', 'true')
   }
   if (activeTags && activeTags.length > 0) {
     params.set('tags', activeTags.join(','))
@@ -129,6 +131,15 @@ export default function SearchResults({ query, filter, activeSource, onSelectCon
             )}
             {hit.llm_failed && (
               <span className="badge badge-failed">❌ Failed</span>
+            )}
+            {hit.is_favorite && (
+              <span className="badge badge-fav">★ Favorite</span>
+            )}
+            {hit.is_xx && (
+              <span className="badge badge-xx">XX</span>
+            )}
+            {hit.is_xxx && (
+              <span className="badge badge-xxx">XXX</span>
             )}
           </div>
 

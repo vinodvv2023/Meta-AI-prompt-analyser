@@ -14,10 +14,13 @@ Endpoints:
   GET  /health          - Health check
 """
 import logging
+import os
 import threading
 import time
 from contextlib import asynccontextmanager
 from typing import Optional
+
+import httpx
 
 import meilisearch
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
@@ -29,6 +32,7 @@ from ingestor import (
     get_client,
     setup_index,
     ingest_all,
+    ingest_file,
     start_watcher,
     INDEX_NAME,
     SOURCE_DIR,
@@ -50,6 +54,25 @@ _KEYWORDS_TTL = 60
 
 class FavoriteRequest(BaseModel):
     is_favorite: bool
+
+
+class XxRequest(BaseModel):
+    is_xx: bool
+
+
+class XxxRequest(BaseModel):
+    is_xxx: bool
+
+
+class CustomPromptRequest(BaseModel):
+    prompt: str
+    ai_response: Optional[str] = ""
+    type: Optional[str] = "image_prompt"
+    label: Optional[str] = None
+    date: Optional[str] = None
+    is_xx: Optional[bool] = False
+    is_xxx: Optional[bool] = False
+    is_favorite: Optional[bool] = False
 
 
 class TagsRequest(BaseModel):
@@ -101,6 +124,8 @@ def _build_filter(
     favorite: Optional[bool],
     tags: Optional[str],
     source: Optional[str],
+    xx: Optional[bool] = None,
+    xxx: Optional[bool] = None,
 ) -> Optional[str]:
     parts = []
     if type_:
@@ -115,6 +140,10 @@ def _build_filter(
         parts.append(f'date = "{date}"')
     if favorite is not None:
         parts.append(f'is_favorite = {"true" if favorite else "false"}')
+    if xx is not None:
+        parts.append(f'is_xx = {"true" if xx else "false"}')
+    if xxx is not None:
+        parts.append(f'is_xxx = {"true" if xxx else "false"}')
     if tags:
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
         for tag in tag_list:
@@ -135,13 +164,15 @@ async def search(
     favorite: Optional[bool] = Query(default=None),
     tags: Optional[str] = Query(default=None),
     source: Optional[str] = Query(default=None),
+    xx: Optional[bool] = Query(default=None),
+    xxx: Optional[bool] = Query(default=None),
     limit: int = Query(default=20, le=100),
     offset: int = Query(default=0),
 ):
     client = get_client()
     index = client.get_index(INDEX_NAME)
 
-    filter_str = _build_filter(type, mj, failed, has_video, date, favorite, tags, source)
+    filter_str = _build_filter(type, mj, failed, has_video, date, favorite, tags, source, xx, xxx)
 
     params = {
         "limit": limit,
@@ -149,7 +180,7 @@ async def search(
         "attributesToHighlight": ["all_user_prompts", "all_ai_responses", "label"],
         "highlightPreTag": "<mark>",
         "highlightPostTag": "</mark>",
-        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "source_file"],
+        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "is_xx", "is_xxx", "source_file"],
     }
     if filter_str:
         params["filter"] = filter_str
@@ -176,12 +207,14 @@ async def get_tree(
     favorite: Optional[bool] = Query(default=None),
     tags: Optional[str] = Query(default=None),
     source: Optional[str] = Query(default=None),
+    xx: Optional[bool] = Query(default=None),
+    xxx: Optional[bool] = Query(default=None),
 ):
     """Return tree metadata for the left nav: { date: [{ id, label, type, ... }] }"""
     client = get_client()
     index = client.get_index(INDEX_NAME)
 
-    filter_str = _build_filter(type, mj, failed, None, None, favorite, tags, source)
+    filter_str = _build_filter(type, mj, failed, None, None, favorite, tags, source, xx, xxx)
     if filter_str:
         filter_str = f'(type != "media") AND ({filter_str})'
     else:
@@ -191,7 +224,7 @@ async def get_tree(
     offset = 0
     batch = 1000
     fields = ["id", "date", "label", "type", "is_midjourney_style", "has_video",
-               "llm_failed", "all_user_prompts", "is_favorite", "source_file"]
+               "llm_failed", "all_user_prompts", "is_favorite", "is_xx", "is_xxx", "source_file"]
 
     while True:
         params: dict = {"limit": batch, "offset": offset, "fields": fields}
@@ -219,6 +252,8 @@ async def get_tree(
             "has_video": d.get("has_video", False),
             "llm_failed": d.get("llm_failed", False),
             "is_favorite": d.get("is_favorite", False),
+            "is_xx": d.get("is_xx", False),
+            "is_xxx": d.get("is_xxx", False),
             "source_file": d.get("source_file", ""),
             "preview": preview,
         })
@@ -244,6 +279,35 @@ async def trigger_ingest(background_tasks: BackgroundTasks):
     return {"message": "Re-ingest started in background"}
 
 
+THREADS_API_URL = os.getenv("THREADS_API_URL", "http://localhost:8002")
+
+
+@app.post("/extract-threads")
+async def extract_threads():
+    async with httpx.AsyncClient() as client:
+        try:
+            r = await client.post(f"{THREADS_API_URL}/export", timeout=30.0)
+            if r.status_code != 200:
+                raise HTTPException(status_code=r.status_code, detail=r.text)
+            data = r.json()
+            
+            # Synchronously ingest the updated threads prompts file
+            from ingestor import ingest_file, get_client
+            threads_file = SOURCE_DIR / "threads-prompts.json"
+            ingested_count = ingest_file(str(threads_file), get_client())
+            
+            return {
+                "status": "success",
+                "exported_count": data.get("count"),
+                "ingested_count": ingested_count,
+                "message": f"Successfully extracted {data.get('count')} prompts and ingested {ingested_count} into Meilisearch."
+            }
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to connect to Threads API: {exc}")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.get("/stats")
 async def get_stats():
     client = get_client()
@@ -251,12 +315,23 @@ async def get_stats():
 
     stats = index.get_stats()
     facet_result = index.search("", {
-        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "source_file"],
+        "facets": ["type", "is_midjourney_style", "llm_failed", "has_video", "is_favorite", "is_xx", "is_xxx", "source_file"],
         "limit": 0,
     })
+
+    # Check if Threads API is live
+    threads_live = False
+    try:
+        async with httpx.AsyncClient() as hc:
+            res = await hc.get(f"{THREADS_API_URL}/health", timeout=0.8)
+            threads_live = (res.status_code == 200)
+    except Exception:
+        pass
+
     return {
         "total_documents": stats.number_of_documents,
         "facets": facet_result.get("facetDistribution"),
+        "threads_api_live": threads_live
     }
 
 
@@ -270,6 +345,83 @@ async def health():
         return {"status": "error", "detail": str(exc)}
 
 
+from typing import Any
+
+def _update_custom_prompt_file_field(doc_id: str, field: str, value: Any):
+    import json
+    file_path = SOURCE_DIR / "user-prompts.json"
+    if not file_path.exists():
+        return
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            prompts = json.load(f)
+
+        updated = False
+        for p in prompts:
+            if p.get("id") == doc_id:
+                p[field] = value
+                updated = True
+                break
+
+        if updated:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(prompts, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error updating user-prompts.json field {field} for doc {doc_id}: {e}")
+
+
+def _save_custom_prompt(entry: CustomPromptRequest) -> dict:
+    import json
+    from datetime import datetime
+    import hashlib
+    import random
+
+    file_path = SOURCE_DIR / "user-prompts.json"
+
+    # Load existing prompts
+    prompts = []
+    if file_path.exists():
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                prompts = json.load(f)
+        except Exception:
+            prompts = []
+
+    # Create new record
+    date_str = entry.date or datetime.now().strftime("%Y-%m-%d")
+    prompt_text = entry.prompt.strip()
+
+    # Generate stable id
+    doc_id = hashlib.sha256(f"user:{date_str}:{prompt_text[:200]}".encode()).hexdigest()[:16]
+
+    # Handle collisions
+    existing_ids = {p.get("id") for p in prompts if "id" in p}
+    if doc_id in existing_ids:
+        doc_id = hashlib.sha256(f"user:{date_str}:{prompt_text[:200]}:{random.random()}".encode()).hexdigest()[:16]
+
+    label_str = entry.label or f"User Prompt {date_str}"
+
+    new_prompt = {
+        "id": doc_id,
+        "label": label_str,
+        "prompt": prompt_text,
+        "ai_response": entry.ai_response or "",
+        "type": entry.type or "image_prompt",
+        "date": date_str,
+        "is_favorite": entry.is_favorite or False,
+        "is_xx": entry.is_xx or False,
+        "is_xxx": entry.is_xxx or False,
+    }
+
+    prompts.append(new_prompt)
+
+    # Write back
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(prompts, f, indent=2)
+
+    return new_prompt
+
+
 @app.patch("/conversation/{doc_id}/favorite")
 async def toggle_favorite(doc_id: str, body: FavoriteRequest):
     client = get_client()
@@ -279,9 +431,63 @@ async def toggle_favorite(doc_id: str, body: FavoriteRequest):
         d = doc if isinstance(doc, dict) else dict(doc)
         d["is_favorite"] = body.is_favorite
         index.update_documents([d])
+
+        if d.get("source_file") == "user-prompts.json":
+            _update_custom_prompt_file_field(doc_id, "is_favorite", body.is_favorite)
+
         return {"id": doc_id, "is_favorite": body.is_favorite}
     except meilisearch.errors.MeilisearchApiError:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@app.patch("/conversation/{doc_id}/xx")
+async def toggle_xx(doc_id: str, body: XxRequest):
+    client = get_client()
+    index = client.get_index(INDEX_NAME)
+    try:
+        doc = index.get_document(doc_id)
+        d = doc if isinstance(doc, dict) else dict(doc)
+        d["is_xx"] = body.is_xx
+        index.update_documents([d])
+
+        if d.get("source_file") == "user-prompts.json":
+            _update_custom_prompt_file_field(doc_id, "is_xx", body.is_xx)
+
+        return {"id": doc_id, "is_xx": body.is_xx}
+    except meilisearch.errors.MeilisearchApiError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@app.patch("/conversation/{doc_id}/xxx")
+async def toggle_xxx(doc_id: str, body: XxxRequest):
+    client = get_client()
+    index = client.get_index(INDEX_NAME)
+    try:
+        doc = index.get_document(doc_id)
+        d = doc if isinstance(doc, dict) else dict(doc)
+        d["is_xxx"] = body.is_xxx
+        index.update_documents([d])
+
+        if d.get("source_file") == "user-prompts.json":
+            _update_custom_prompt_file_field(doc_id, "is_xxx", body.is_xxx)
+
+        return {"id": doc_id, "is_xxx": body.is_xxx}
+    except meilisearch.errors.MeilisearchApiError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@app.post("/conversation/custom")
+async def create_custom_prompt(body: CustomPromptRequest):
+    try:
+        new_prompt_doc = _save_custom_prompt(body)
+
+        # Synchronously ingest so Meilisearch is updated immediately
+        client = get_client()
+        ingest_file(str(SOURCE_DIR / "user-prompts.json"), client)
+
+        return new_prompt_doc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.patch("/conversation/{doc_id}/tags")
@@ -389,3 +595,76 @@ async def get_favorites():
         offset += batch
 
     return [doc if isinstance(doc, dict) else dict(doc) for doc in all_docs]
+
+
+def _delete_custom_prompt_from_file(doc_id: str):
+    import json
+    file_path = SOURCE_DIR / "user-prompts.json"
+    if not file_path.exists():
+        return
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            prompts = json.load(f)
+        
+        updated_prompts = [p for p in prompts if p.get("id") != doc_id]
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(updated_prompts, f, indent=2)
+    except Exception as e:
+        logger.error(f"Error deleting user prompt {doc_id} from JSON: {e}")
+
+
+def _delete_threads_prompt_from_file(doc_id: str):
+    import json
+    import hashlib
+    file_path = SOURCE_DIR / "threads-prompts.json"
+    if not file_path.exists():
+        return
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        updated_entries = []
+        label_values = data.get("label_values", [])
+        if label_values and label_values[0].get("dict"):
+            dict_outer = label_values[0]["dict"]
+            if dict_outer and dict_outer[0].get("dict"):
+                entries = dict_outer[0]["dict"]
+                for entry in entries:
+                    label = entry.get("label", "")
+                    value = entry.get("value", "")
+                    entry_id = hashlib.sha256(f"threads:{label}:{value[:200]}".encode()).hexdigest()[:16]
+                    if entry_id != doc_id:
+                        updated_entries.append(entry)
+                
+                dict_outer[0]["dict"] = updated_entries
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Error deleting threads prompt {doc_id} from JSON: {e}")
+
+
+@app.delete("/conversation/{doc_id}")
+async def delete_conversation(doc_id: str):
+    client = get_client()
+    index = client.get_index(INDEX_NAME)
+    try:
+        doc = index.get_document(doc_id)
+        d = doc if isinstance(doc, dict) else dict(doc)
+        source_file = d.get("source_file")
+        
+        # Delete from Meilisearch
+        index.delete_document(doc_id)
+        
+        # Delete from local files
+        if source_file == "user-prompts.json":
+            _delete_custom_prompt_from_file(doc_id)
+        elif source_file == "threads-prompts.json":
+            _delete_threads_prompt_from_file(doc_id)
+            
+        return {"status": "success", "message": f"Prompt {doc_id} deleted successfully."}
+    except meilisearch.errors.MeilisearchApiError as exc:
+        raise HTTPException(status_code=404, detail="Conversation not found or failed to delete")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))

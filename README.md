@@ -30,7 +30,7 @@ A local-first web application for parsing, classifying, searching, and browsing 
 └──────────────────────┬──────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────┐
-│  FastAPI Backend (http://localhost:8000)                    │
+│  FastAPI Backend (http://localhost:8001)                    │
 │  - Search proxy (faceted filtering, highlighting)           │
 │  - Favorites & tags CRUD                                    │
 │  - Keyword aggregation                                      │
@@ -213,7 +213,7 @@ Place your Meta AI JSON export file(s) in the `source/` folder. The expected for
 Double-click `start.bat` — it launches all three services in separate windows:
 
 1. Meilisearch on `http://localhost:7700`
-2. FastAPI backend on `http://localhost:8000` (API docs at `/docs`)
+2. FastAPI backend on `http://localhost:8001` (API docs at `/docs`)
 3. Vite dev server on `http://localhost:5173`
 
 The browser opens automatically.
@@ -234,7 +234,7 @@ docker run -it -p 7700:7700 -e MEILI_MASTER_KEY=masterKey123 getmeili/meilisearc
 **Terminal 2 — Backend:**
 ```bash
 cd backend
-python -m uvicorn main:app --reload --port 8000
+python -m uvicorn main:app --reload --port 8001
 ```
 
 **Terminal 3 — Frontend:**
@@ -267,7 +267,7 @@ npm install
 
 If there are changes to the classifier or parser, trigger a re-ingest to re-classify all documents:
 
-1. Open `http://localhost:8000/docs`
+1. Open `http://localhost:8001/docs`
 2. Execute the `POST /ingest` endpoint, or
 3. Click the refresh button in the Stats bar of the web UI
 

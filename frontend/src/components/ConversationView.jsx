@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react'
 import TurnCard from './TurnCard'
 import { CopyButton } from './TurnCard'
 import FavoriteButton from './FavoriteButton'
+import XxButton from './XxButton'
+import XxxButton from './XxxButton'
 import TagManager from './TagManager'
 
 const TYPE_LABELS = {
@@ -15,7 +17,7 @@ const TYPE_LABELS = {
 const VIDEO_RE = /\b(animate|create.*?video|make.*?video|1080p|seconds video|hd video)\b/i
 const IMAGE_RE = /\b(portrait|create|generate|image|photo|illustration|--v|--stylize|--ar)\b/i
 
-export default function ConversationView({ id }) {
+export default function ConversationView({ id, onDelete }) {
   const [doc, setDoc] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,6 +34,28 @@ export default function ConversationView({ id }) {
       .then(data => { setDoc(data); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [id])
+
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    const confirmDelete = window.confirm("Are you sure you want to delete this prompt? This will remove it permanently.")
+    if (!confirmDelete) return
+
+    try {
+      const res = await fetch(`/api/conversation/${doc.id}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        throw new Error('Failed to delete prompt')
+      }
+      alert('Prompt deleted successfully.')
+      if (onDelete) {
+        onDelete(doc.id)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error deleting prompt. Please try again.')
+    }
+  }
 
   // ── Derive "copy all image prompts" and "copy all video prompts" text ─────
   const { allImageText, allVideoText } = useMemo(() => {
@@ -74,7 +98,8 @@ export default function ConversationView({ id }) {
   const aspects = doc.image_aspects || {}
   const hasAspects = Object.keys(aspects).length > 0
 
-  const aiName = (doc.source_file || '').includes('grok') ? 'Grok' : 'Meta AI'
+  const sf = doc.source_file || ''
+  const aiName = sf.includes('grok') ? 'Grok' : sf.includes('thread') ? 'Threads' : sf.includes('user') ? 'User Prompt' : 'Meta AI'
   const isGrok = aiName === 'Grok'
 
   const hasImageContent = allImageText.length > 0
@@ -95,7 +120,35 @@ export default function ConversationView({ id }) {
           {doc.llm_failed && (
             <span className="badge badge-failed">❌ LLM Failed</span>
           )}
-          <FavoriteButton docId={doc.id} isFavorite={doc.is_favorite} />
+          <div className="conv-actions">
+            <FavoriteButton docId={doc.id} isFavorite={doc.is_favorite} />
+            <XxButton docId={doc.id} isXx={doc.is_xx} />
+            <XxxButton docId={doc.id} isXxx={doc.is_xxx} />
+            <button
+              className="delete-btn"
+              onClick={handleDelete}
+              title="Delete prompt"
+              aria-label="Delete prompt"
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
+                padding: '4px 8px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                marginLeft: '8px',
+                height: '24px'
+              }}
+            >
+              🗑️ Delete
+            </button>
+          </div>
         </div>
 
         {/* ── Bulk copy buttons ───────────────────────────────────────────── */}

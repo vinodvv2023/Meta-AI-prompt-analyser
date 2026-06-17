@@ -150,3 +150,70 @@ def parse_json_file(filepath: str) -> List[Dict[str, Any]]:
                     documents.append(doc)
 
     return documents
+
+
+def parse_user_prompts_file(filepath: str) -> List[Dict[str, Any]]:
+    """
+    Parse a custom user prompts JSON file (flat array format).
+    Expected keys in each item: id, label, prompt, ai_response, type, date, is_favorite, is_xx, is_xxx, custom_tags
+    """
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        raw = f.read()
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Failed to parse JSON in {filepath}: {exc}") from exc
+
+    if not isinstance(data, list):
+        raise ValueError(f"Custom prompts file {filepath} must contain a JSON list")
+
+    documents = []
+    source_file = Path(filepath).name
+
+    for idx, entry in enumerate(data):
+        prompt_text = entry.get("prompt", "").strip()
+        if not prompt_text:
+            continue
+
+        date_str = entry.get("date", "")
+        if not date_str:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+        label_str = entry.get("label", "").strip() or f"User Prompt {date_str}"
+        ai_response = entry.get("ai_response", "").strip()
+
+        # Build conversation turns
+        turns = [{"speaker": "You", "text": prompt_text, "turn_index": 0}]
+        if ai_response:
+            turns.append({"speaker": "Meta AI", "text": ai_response, "turn_index": 1})
+
+        # Stable ID
+        doc_id = entry.get("id")
+        if not doc_id:
+            doc_id = hashlib.sha256(f"user:{date_str}:{prompt_text[:200]}:{idx}".encode()).hexdigest()[:16]
+
+        doc = {
+            "id": doc_id,
+            "label": label_str,
+            "parent_label": "User Prompts",
+            "child_group_label": "Custom",
+            "source_file": source_file,
+            "date": date_str,
+            "turns": turns,
+            "all_user_prompts": prompt_text,
+            "all_ai_responses": ai_response,
+            "type": entry.get("type", "image_prompt"),
+            "is_midjourney_style": False,
+            "mj_flags": [],
+            "has_video": entry.get("type") == "video_prompt",
+            "image_aspects": {},
+            "llm_failed": False,
+            "custom_tags": entry.get("custom_tags", []),
+            "is_favorite": entry.get("is_favorite", False),
+            "is_xx": entry.get("is_xx", False),
+            "is_xxx": entry.get("is_xxx", False),
+        }
+        documents.append(doc)
+
+    return documents

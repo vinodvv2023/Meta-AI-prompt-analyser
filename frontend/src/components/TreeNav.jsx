@@ -12,6 +12,8 @@ const TYPE_ICON = {
 const SOURCE_ICON = {
   'prompts.json': '🟦',
   'prod-grok-backend.json': '🟧',
+  'threads-prompts.json': '🟩',
+  'user-prompts.json': '🔮',
 }
 
 function buildApiParams(filterId, activeTags, sourceId) {
@@ -19,7 +21,9 @@ function buildApiParams(filterId, activeTags, sourceId) {
   if (filterId === 'mj')       params += '&mj=true'
   if (filterId === 'failed')   params += '&failed=true'
   if (filterId === 'favorites') params += '&favorite=true'
-  if (filterId && filterId !== 'all' && filterId !== 'mj' && filterId !== 'failed' && filterId !== 'favorites') {
+  if (filterId === 'xx')        params += '&xx=true'
+  if (filterId === 'xxx')       params += '&xxx=true'
+  if (filterId && filterId !== 'all' && filterId !== 'mj' && filterId !== 'failed' && filterId !== 'favorites' && filterId !== 'xx' && filterId !== 'xxx') {
     params += `&type=${filterId}`
   }
   if (activeTags && activeTags.length > 0) {
@@ -32,7 +36,7 @@ function buildApiParams(filterId, activeTags, sourceId) {
   return params
 }
 
-export default function TreeNav({ activeFilter, activeSource, selectedId, onSelect, activeTags }) {
+export default function TreeNav({ activeFilter, activeSource, selectedId, onSelect, activeTags, refreshTrigger }) {
   const [tree, setTree] = useState({})
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState({})
@@ -45,7 +49,7 @@ export default function TreeNav({ activeFilter, activeSource, selectedId, onSele
       .then(r => r.json())
       .then(data => { setTree(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [activeFilter, activeTags, activeSource])
+  }, [activeFilter, activeTags, activeSource, refreshTrigger])
 
   const toggleDate = (date) =>
     setCollapsed(prev => ({ ...prev, [date]: !prev[date] }))
@@ -120,6 +124,12 @@ export default function TreeNav({ activeFilter, activeSource, selectedId, onSele
                       <div className="tree-item-badges">
                         {item.is_favorite && (
                           <span className="badge badge-fav">★</span>
+                        )}
+                        {item.is_xx && (
+                          <span className="badge badge-xx">XX</span>
+                        )}
+                        {item.is_xxx && (
+                          <span className="badge badge-xxx">XXX</span>
                         )}
                         {item.is_midjourney_style && (
                           <span className="badge badge-mj">MJ</span>
