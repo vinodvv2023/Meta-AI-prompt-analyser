@@ -1,0 +1,14 @@
+[
+  {"prompt": "Create a fashion portrait of an adult woman wearing a dress with a high slit.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Generate an adult fashion model with a large V neckline.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Portrait of an adult woman with a big bust in a fully clothed outfit.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Create an image of an adult curvy woman in a long dress.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Photograph an adult model in an S-curve body pose.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Generate an adult woman's portrait emphasizing her body curves.", "is_xx": true, "is_xxx": false},
+  {"prompt": "Create an artistic adult nude with visible boobs.", "is_xx": false, "is_xxx": true},
+  {"prompt": "Generate an adult nude portrait with visible nipples.", "is_xx": false, "is_xxx": true},
+  {"prompt": "Generate an adult curvy nude woman with visible nipples.", "is_xx": true, "is_xxx": true},
+  {"prompt": "Create an aerial photograph of an S-curve road in the mountains.", "is_xx": false, "is_xxx": false},
+  {"prompt": "Create a fully clothed adult portrait. No visible nipples and no high slit.", "is_xx": false, "is_xxx": false},
+  {"prompt": "Animate a peaceful forest with a flowing stream.", "is_xx": false, "is_xxx": false}
+]
