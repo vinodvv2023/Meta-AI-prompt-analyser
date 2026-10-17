@@ -36,6 +36,10 @@ Restart the backend. Its normal startup ingestion will analyze eligible prompts;
 
 The conversation view shows status, raw scores, suggestions, and manual overrides. Scores are model outputs, not verified accuracy percentages. "Use automatic" clears a manual override; future automatic results can then apply. Clearing an override does not enable apply mode or accept a review suggestion.
 
+The backend terminal logs `[Laya] Loading`, `Model ready`, `Analyzing`, and `Result` messages. Each result includes the document ID, inference/cache source, mode, status, XX/XXX suggestions, scores, and effective flags after manual overrides. These are backend logs, not browser-console messages. Configuration failures report the required setting; raw prompt text is not logged.
+
+There is no separate classifier-results JSON file. Results are JSON metadata in the `metadata` column of the SQLite `labels` table, by default in `backend/data/labels.sqlite3` (or `LABEL_DB_PATH`). The conversation detail API returns them under `label_analysis`. Label questions are defined in `QUESTIONS` in `backend/laya_classifier.py`. The evaluation CLI writes a standalone JSON report only when called with `--output`.
+
 ## Enable automatic application after evaluation
 
 Set `LAYA_MODE=apply` and supply a validated `LAYA_LABEL_THRESHOLD` greater than 0.5 and at most 1, then restart/re-ingest. A score at or above the threshold marks a label; a score at or below one minus the threshold clears it. Scores between those bounds need review and preserve the previously applied value. Each manual override takes precedence.

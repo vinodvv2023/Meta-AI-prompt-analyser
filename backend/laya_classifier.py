@@ -35,7 +35,10 @@ def agent(model, revision):
         raise RuntimeError("Model initialization will retry after a short cooldown")
     try:
         import laya
-        return laya.load(model, revision=revision)
+        logger.info("[Laya] Loading model=%s revision=%s", model, revision)
+        loaded = laya.load(model, revision=revision)
+        logger.info("[Laya] Model ready")
+        return loaded
     except Exception:
         _RETRY_AFTER = time.monotonic() + 60
         raise
@@ -47,7 +50,7 @@ class ConfigurationError(ValueError):
 
 @lru_cache(maxsize=8)
 def warn_unavailable(kind):
-    logger.warning("Laya classification unavailable (%s); inspect label analysis status", kind)
+    logger.warning("[Laya] Classification unavailable: %s; inspect label analysis status", kind)
 
 
 def evaluate(text, model, revision):
@@ -102,9 +105,11 @@ def classify(doc):
             raise ConfigurationError("LAYA_LABEL_THRESHOLD must be greater than 0.5 and at most 1")
         if mode == "apply" and threshold is None:
             raise ConfigurationError("Set a validated LAYA_LABEL_THRESHOLD before automatic application")
-        if previous.get("signature") == signature and previous.get("status") == "complete":
+        cached = previous.get("signature") == signature and previous.get("status") == "complete"
+        if cached:
             analysis = {**previous, "mode": mode}
         else:
+            logger.info("[Laya] Analyzing id=%s mode=%s", doc["id"], mode)
             scores = evaluate(text, model, revision)
             suggestions = {field: (score >= 0.5 if threshold is None else
                                    True if score >= threshold else
@@ -114,9 +119,18 @@ def classify(doc):
                             status="complete" if all(v is not None for v in suggestions.values()) else "needs_review",
                             analyzed_at=datetime.now(timezone.utc).isoformat())
         label_store.save_analysis(doc["id"], analysis, apply=mode == "apply")
+        effective = label_store.project(dict(doc))
+        logger.info(
+            "[Laya] Result id=%s source=%s mode=%s status=%s "
+            "XX=%s score=%.4f XXX=%s score=%.4f effective_XX=%s effective_XXX=%s",
+            doc["id"], "cache" if cached else "inference", mode, analysis["status"],
+            analysis["suggestions"]["is_xx"], analysis["scores"]["is_xx"],
+            analysis["suggestions"]["is_xxx"], analysis["scores"]["is_xxx"],
+            effective.get("is_xx", False), effective.get("is_xxx", False),
+        )
     except Exception as exc:
         # Store operational details without echoing user text or model exceptions into logs.
-        warn_unavailable(type(exc).__name__)
+        warn_unavailable(str(exc) if isinstance(exc, ConfigurationError) else type(exc).__name__)
         analysis.update(status="error", error=str(exc) if isinstance(exc, ConfigurationError) else
                         "Analysis unavailable; check Laya installation and configuration.")
         label_store.save_analysis(doc["id"], analysis)

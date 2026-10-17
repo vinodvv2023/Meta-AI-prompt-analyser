@@ -103,3 +103,20 @@ def test_concurrent_custom_creation_preserves_both_prompts(search, monkeypatch, 
     saved = json.loads((tmp_path / "user-prompts.json").read_text())
     assert len(saved) == 2
     assert {doc["id"] for doc in saved} == {doc["id"] for doc in created}
+
+
+def test_console_reports_inference_cache_and_manual_override(search, monkeypatch, caplog):
+    import laya_classifier
+    monkeypatch.setenv("LAYA_MODE", "apply")
+    monkeypatch.setenv("LAYA_LABEL_THRESHOLD", "0.9")
+    monkeypatch.setattr(laya_classifier, "evaluate", Mock(return_value={"is_xx": 0.98, "is_xxx": 0.01}))
+    doc = {"id": "console-test", "type": "image_prompt", "all_user_prompts": "Private prompt text"}
+    label_store.seed(doc)
+    label_store.set_override(doc["id"], "is_xx", False)
+    with caplog.at_level("INFO", logger="laya_classifier"):
+        laya_classifier.classify(doc)
+        laya_classifier.classify(doc)
+    assert "source=inference" in caplog.text and "source=cache" in caplog.text
+    assert "XX=True score=0.9800" in caplog.text
+    assert "effective_XX=False" in caplog.text
+    assert "Private prompt text" not in caplog.text
