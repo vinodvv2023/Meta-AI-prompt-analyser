@@ -1,0 +1,2 @@
+# Optional local inference runtime; base API installation remains lightweight.
+laya==0.4.9
