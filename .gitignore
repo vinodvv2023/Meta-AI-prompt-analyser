@@ -28,6 +28,13 @@ _label_communities.py
 _merge_final.py
 _merge_sem.py
 
+# Local agent tools and scratch files
+/.gitnexus/
+/.agents/
+/.claude/
+/scratch/
+/backend/data/
+
 # Misc
 check_meili.py
 sample.json
