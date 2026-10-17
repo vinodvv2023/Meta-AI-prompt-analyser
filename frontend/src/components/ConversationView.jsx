@@ -1,10 +1,12 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import TurnCard from './TurnCard'
 import { CopyButton } from './TurnCard'
 import FavoriteButton from './FavoriteButton'
 import XxButton from './XxButton'
 import XxxButton from './XxxButton'
 import TagManager from './TagManager'
+import LabelAnalysis from './LabelAnalysis'
+import { useGetConversationQuery } from '../stores/labelsApi'
 
 const TYPE_LABELS = {
   image_prompt: { label: 'Image Prompt', cls: 'badge-image' },
@@ -18,22 +20,10 @@ const VIDEO_RE = /\b(animate|create.*?video|make.*?video|1080p|seconds video|hd 
 const IMAGE_RE = /\b(portrait|create|generate|image|photo|illustration|--v|--stylize|--ar)\b/i
 
 export default function ConversationView({ id, onDelete }) {
-  const [doc, setDoc] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
-    fetch(`/api/conversation/${id}`)
-      .then(r => {
-        if (!r.ok) throw new Error('Not found')
-        return r.json()
-      })
-      .then(data => { setDoc(data); setLoading(false) })
-      .catch(e => { setError(e.message); setLoading(false) })
-  }, [id])
+  const { currentData: doc, isFetching, error } = useGetConversationQuery(id, {
+    skip: !id, refetchOnMountOrArgChange: true,
+  })
+  const loading = !doc && isFetching
 
   const handleDelete = async (e) => {
     e.stopPropagation()
@@ -89,7 +79,7 @@ export default function ConversationView({ id, onDelete }) {
     <div className="empty-state">
       <div className="empty-icon">⚠️</div>
       <h2>Failed to load</h2>
-      <p>{error}</p>
+      <p>Could not load this conversation. Please try again.</p>
     </div>
   )
   if (!doc) return null
@@ -178,6 +168,8 @@ export default function ConversationView({ id, onDelete }) {
           </div>
         )}
       </div>
+
+      <LabelAnalysis analysis={doc.label_analysis} />
 
       {/* Aspects panel */}
       {hasAspects && (

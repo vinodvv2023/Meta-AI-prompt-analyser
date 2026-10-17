@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "frontend/src/index.css"
+        ],
+        "createdAt": "2026-10-17T10:37:07.129Z",
+        "reason": "Agent retained the pre-existing .brand-title wordmark gradient; this task adds label controls and does not redesign the application brand."
+      }
+    ]
+  }
+}

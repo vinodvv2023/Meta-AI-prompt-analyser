@@ -42,6 +42,54 @@
   font-family: 'Inter', system-ui, sans-serif;
 }
 
+/* Prompt label analysis shares the conversation theme and wraps on narrow panels. */
+.label-analysis {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.label-analysis-heading, .label-analysis-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.label-analysis strong { color: var(--text-primary); }
+.label-analysis-results { margin-top: 12px; }
+.label-analysis-results > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.label-analysis p { margin-top: 8px; }
+.label-control { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: 100%; }
+.label-reset {
+  padding: 6px 8px;
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.label-reset:hover { background: var(--bg-card-hover); }
+.label-control button:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+.label-control button:disabled { opacity: 0.6; cursor: wait; }
+.label-note, .label-error { width: 100%; font-size: 12px; color: var(--text-secondary); }
+.label-error { color: #fca5a5; }
+.conv-actions:has(.label-control) { flex-wrap: wrap; }
+.label-control .fav-btn { min-width: 44px; min-height: 44px; color: var(--text-secondary); }
+.label-control .label-reset { min-height: 44px; }
+@media (max-width: 600px) {
+  .label-analysis { padding: 12px; }
+  .conv-actions:has(.label-control) { margin-left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .label-control button { transition: none; }
+}
+
 /* ─── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
