@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import { splitHighlight } from './labelKeywords'
 
 // ─── Common English words to NOT treat as MJ reference codes ─────────────────
 const COMMON_EN = new Set([
@@ -28,6 +29,8 @@ const COMMON_EN = new Set([
   'vision','window','hologram','digital','sphere','circle','spiral','prism',
   'shadow','silver','golden','copper','bronze','chrome','atomic',
   'matrix','galaxy','nebula','particle','crystal','mirror','tunnel','portal',
+  // Label vocabulary must remain visible for keyword highlighting.
+  'curvy','curve','curves','large','nipple','nipples','breast','breasts','boobs','adult',
 ])
 
 // Is a token a MJ reference code?
@@ -183,7 +186,7 @@ const FLAG_DETECT_RE = /--[a-z]/i
 /**
  * Render one turn in the conversation timeline.
  */
-export default function TurnCard({ turn, convType, isMj, mjFlags, aiName = 'Meta AI' }) {
+export default function TurnCard({ turn, convType, isMj, mjFlags, aiName = 'Meta AI', highlightTerm = '' }) {
   const isYou = turn.speaker === 'You'
 
   // Parse MJ flags only for "You" turns in MJ conversations
@@ -229,7 +232,8 @@ export default function TurnCard({ turn, convType, isMj, mjFlags, aiName = 'Meta
 
       {/* Body */}
       <div className="turn-body">
-        <div className="turn-text">{cleanPrompt}</div>
+        <div className="turn-text">{splitHighlight(cleanPrompt, isYou ? highlightTerm : '').map((part, i) =>
+          i % 2 ? <mark key={i}>{part}</mark> : part)}</div>
 
         {/* Flags rendered as code chips */}
         {parsedFlags.length > 0 && (

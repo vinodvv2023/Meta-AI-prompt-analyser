@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import TurnCard from './TurnCard'
 import { CopyButton } from './TurnCard'
 import FavoriteButton from './FavoriteButton'
@@ -20,6 +20,8 @@ const VIDEO_RE = /\b(animate|create.*?video|make.*?video|1080p|seconds video|hd 
 const IMAGE_RE = /\b(portrait|create|generate|image|photo|illustration|--v|--stylize|--ar)\b/i
 
 export default function ConversationView({ id, onDelete }) {
+  const [selection, setSelection] = useState({ id: null, term: '' })
+  const activeTerm = selection.id === id ? selection.term : ''
   const { currentData: doc, isFetching, error } = useGetConversationQuery(id, {
     skip: !id, refetchOnMountOrArgChange: true,
   })
@@ -169,7 +171,9 @@ export default function ConversationView({ id, onDelete }) {
         )}
       </div>
 
-      <LabelAnalysis analysis={doc.label_analysis} />
+      <LabelAnalysis analysis={doc.label_analysis}
+        promptText={(doc.turns || []).filter(turn => turn.speaker === 'You').map(turn => turn.text).join('\n')}
+        activeTerm={activeTerm} onSelectTerm={term => setSelection({ id, term })} />
 
       {/* Aspects panel */}
       {hasAspects && (
@@ -235,6 +239,7 @@ export default function ConversationView({ id, onDelete }) {
               isMj={doc.is_midjourney_style}
               mjFlags={doc.mj_flags}
               aiName={aiName}
+              highlightTerm={activeTerm}
             />
           ))}
         </div>
