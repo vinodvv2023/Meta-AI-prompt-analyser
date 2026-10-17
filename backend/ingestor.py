@@ -5,6 +5,7 @@ Also starts a watchdog file watcher for continuous ingestion from the source/ fo
 import os
 import time
 import logging
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -17,6 +18,8 @@ from parser import parse_json_file, parse_user_prompts_file
 from grok_parser import parse_grok_file
 from threads_parser import parse_threads_file
 from classifier import classify_document
+import label_store
+from laya_classifier import classify as classify_labels
 
 load_dotenv()
 
@@ -66,7 +69,7 @@ def setup_index(client: meilisearch.Client) -> meilisearch.index.Index:
         client.wait_for_task(task_uid, timeout_in_ms=10_000)
         index = client.get_index(INDEX_NAME)
 
-    index.update_settings({
+    settings_task = index.update_settings({
         "searchableAttributes": [
             "all_user_prompts",
             "all_ai_responses",
@@ -76,6 +79,7 @@ def setup_index(client: meilisearch.Client) -> meilisearch.index.Index:
             "thread_url",
         ],
         "filterableAttributes": [
+            "id",
             "type",
             "is_midjourney_style",
             "llm_failed",
@@ -101,6 +105,9 @@ def setup_index(client: meilisearch.Client) -> meilisearch.index.Index:
         ],
     })
 
+    completed = client.wait_for_task(settings_task.task_uid, timeout_in_ms=10_000)
+    if completed.status != "succeeded":
+        raise RuntimeError("Failed to configure search index")
     return index
 
 
@@ -139,17 +146,16 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
     index = setup_index(client)
 
     existing_docs = {}
-    try:
-        ids = [d["id"] for d in classified]
-        if ids:
-            for i in range(0, len(ids), 1000):
-                batch_ids = ids[i:i+1000]
-                results = index.get_documents({"filter": None, "fields": ["id", "custom_tags", "is_favorite", "is_xx", "is_xxx"], "limit": 1000})
-                for r in results.results:
-                    rd = r if isinstance(r, dict) else dict(r)
-                    existing_docs[rd.get("id")] = rd
-    except Exception:
-        pass
+    ids = [d["id"] for d in classified]
+    for i in range(0, len(ids), 1000):
+        results = index.get_documents({
+            "filter": "id IN " + json.dumps(ids[i:i + 1000]),
+            "fields": ["id", "custom_tags", "is_favorite", "is_xx", "is_xxx"],
+            "limit": 1000,
+        })
+        for result in results.results:
+            existing = result if isinstance(result, dict) else dict(result)
+            existing_docs[existing["id"]] = existing
 
     for d in classified:
         doc_id = d["id"]
@@ -159,17 +165,28 @@ def ingest_file(filepath: str, client: Optional[meilisearch.Client] = None) -> i
             d["is_favorite"] = existing.get("is_favorite", False)
             d["is_xx"] = existing.get("is_xx", False)
             d["is_xxx"] = existing.get("is_xxx", False)
+            detected = [tag for tags in d.get("detected_categories", {}).values() for tag in tags]
+            d["tags"] = list(dict.fromkeys(detected + d["custom_tags"]))
+    label_store.seed_all(classified)
+    for d in classified:
+        classify_labels(d)
 
     batch_size = 500
     total = 0
     for i in range(0, len(classified), batch_size):
         batch = classified[i : i + batch_size]
-        task = index.add_documents(batch)
-        task_uid = task.task_uid if hasattr(task, "task_uid") else task.uid
-        try:
-            client.wait_for_task(task_uid, timeout_in_ms=10_000)
-        except Exception as e:
-            logger.warning(f"Timeout waiting for indexing task {task_uid}: {e}")
+        # Merge after inference so a manual override saved during a scan wins.
+        with label_store.LABEL_LOCK:
+            batch = [label_store.project(d) for d in batch]
+            for d in batch:
+                d["label_analysis"]["projection_pending"] = False
+            task = index.add_documents(batch)
+            task_uid = task.task_uid if hasattr(task, "task_uid") else task.uid
+            completed = client.wait_for_task(task_uid, timeout_in_ms=10_000)
+            if completed.status != "succeeded":
+                raise RuntimeError(f"Indexing task {task_uid} failed")
+            for d in batch:
+                label_store.projection_done(d["id"])
         total += len(batch)
         logger.info(f"  → Indexed {total}/{len(classified)} documents")
 

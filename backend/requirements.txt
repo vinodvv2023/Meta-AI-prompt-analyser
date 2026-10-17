@@ -4,3 +4,4 @@ meilisearch==0.31.0
 watchdog==4.0.0
 python-dotenv==1.0.1
 python-multipart==0.0.9
+httpx==0.28.1

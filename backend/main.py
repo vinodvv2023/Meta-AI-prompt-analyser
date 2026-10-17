@@ -25,8 +25,10 @@ import httpx
 import meilisearch
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool, Field
 from dotenv import load_dotenv
+from starlette.concurrency import run_in_threadpool
+import label_store
 
 from ingestor import (
     get_client,
@@ -57,11 +59,11 @@ class FavoriteRequest(BaseModel):
 
 
 class XxRequest(BaseModel):
-    is_xx: bool
+    is_xx: Optional[StrictBool] = Field(...)
 
 
 class XxxRequest(BaseModel):
-    is_xxx: bool
+    is_xxx: Optional[StrictBool] = Field(...)
 
 
 class CustomPromptRequest(BaseModel):
@@ -262,12 +264,12 @@ async def get_tree(
 
 
 @app.get("/conversation/{doc_id}")
-async def get_conversation(doc_id: str):
+def get_conversation(doc_id: str):
     client = get_client()
     index = client.get_index(INDEX_NAME)
     try:
         doc = index.get_document(doc_id)
-        return doc
+        return label_store.project(doc if isinstance(doc, dict) else dict(doc))
     except meilisearch.errors.MeilisearchApiError:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -294,7 +296,7 @@ async def extract_threads():
             # Synchronously ingest the updated threads prompts file
             from ingestor import ingest_file, get_client
             threads_file = SOURCE_DIR / "threads-prompts.json"
-            ingested_count = ingest_file(str(threads_file), get_client())
+            ingested_count = await run_in_threadpool(ingest_file, str(threads_file), get_client())
             
             return {
                 "status": "success",
@@ -440,46 +442,52 @@ async def toggle_favorite(doc_id: str, body: FavoriteRequest):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
 
-@app.patch("/conversation/{doc_id}/xx")
-async def toggle_xx(doc_id: str, body: XxRequest):
+def _set_label(doc_id: str, field: str, value: Optional[bool]):
     client = get_client()
     index = client.get_index(INDEX_NAME)
     try:
-        doc = index.get_document(doc_id)
-        d = doc if isinstance(doc, dict) else dict(doc)
-        d["is_xx"] = body.is_xx
-        index.update_documents([d])
+        with label_store.LABEL_LOCK:
+            doc = index.get_document(doc_id)
+            d = doc if isinstance(doc, dict) else dict(doc)
+            label_store.seed(d)
+            label_store.set_override(doc_id, field, value)
+            label_store.project(d)
+            task = index.update_documents([{
+                "id": doc_id, "is_xx": d["is_xx"], "is_xxx": d["is_xxx"],
+                "label_analysis": {**d["label_analysis"], "projection_pending": False},
+            }])
+            completed = client.wait_for_task(task.task_uid, timeout_in_ms=10_000)
+            if completed.status != "succeeded":
+                raise RuntimeError("Search projection failed")
+            label_store.projection_done(doc_id)
+            label_store.project(d)
+            if d.get("source_file") == "user-prompts.json":
+                _update_custom_prompt_file_field(doc_id, field, d[field])
+            return {"id": doc_id, field: d[field], "label_analysis": d["label_analysis"]}
+    except meilisearch.errors.MeilisearchApiError as exc:
+        if getattr(exc, "code", None) == "document_not_found":
+            raise HTTPException(status_code=404, detail="Conversation not found") from exc
+        raise HTTPException(status_code=503, detail="Label update pending; retry or re-ingest.") from exc
+    except Exception as exc:
+        logger.warning("Label update failed (%s)", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Label update failed; retry or re-ingest to sync saved decisions.") from exc
 
-        if d.get("source_file") == "user-prompts.json":
-            _update_custom_prompt_file_field(doc_id, "is_xx", body.is_xx)
 
-        return {"id": doc_id, "is_xx": body.is_xx}
-    except meilisearch.errors.MeilisearchApiError:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+@app.patch("/conversation/{doc_id}/xx")
+def toggle_xx(doc_id: str, body: XxRequest):
+    return _set_label(doc_id, "is_xx", body.is_xx)
 
 
 @app.patch("/conversation/{doc_id}/xxx")
-async def toggle_xxx(doc_id: str, body: XxxRequest):
-    client = get_client()
-    index = client.get_index(INDEX_NAME)
-    try:
-        doc = index.get_document(doc_id)
-        d = doc if isinstance(doc, dict) else dict(doc)
-        d["is_xxx"] = body.is_xxx
-        index.update_documents([d])
-
-        if d.get("source_file") == "user-prompts.json":
-            _update_custom_prompt_file_field(doc_id, "is_xxx", body.is_xxx)
-
-        return {"id": doc_id, "is_xxx": body.is_xxx}
-    except meilisearch.errors.MeilisearchApiError:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+def toggle_xxx(doc_id: str, body: XxxRequest):
+    return _set_label(doc_id, "is_xxx", body.is_xxx)
 
 
 @app.post("/conversation/custom")
-async def create_custom_prompt(body: CustomPromptRequest):
+def create_custom_prompt(body: CustomPromptRequest):
     try:
-        new_prompt_doc = _save_custom_prompt(body)
+        with label_store.LABEL_LOCK:
+            new_prompt_doc = _save_custom_prompt(body)
 
         # Synchronously ingest so Meilisearch is updated immediately
         client = get_client()
@@ -646,7 +654,7 @@ def _delete_threads_prompt_from_file(doc_id: str):
 
 
 @app.delete("/conversation/{doc_id}")
-async def delete_conversation(doc_id: str):
+def delete_conversation(doc_id: str):
     client = get_client()
     index = client.get_index(INDEX_NAME)
     try:
@@ -655,13 +663,17 @@ async def delete_conversation(doc_id: str):
         source_file = d.get("source_file")
         
         # Delete from Meilisearch
-        index.delete_document(doc_id)
-        
-        # Delete from local files
-        if source_file == "user-prompts.json":
-            _delete_custom_prompt_from_file(doc_id)
-        elif source_file == "threads-prompts.json":
-            _delete_threads_prompt_from_file(doc_id)
+        with label_store.LABEL_LOCK:
+            task = index.delete_document(doc_id)
+            completed = client.wait_for_task(task.task_uid, timeout_in_ms=10_000)
+            if completed.status != "succeeded":
+                raise RuntimeError("Search deletion failed")
+            label_store.delete(doc_id)
+
+            if source_file == "user-prompts.json":
+                _delete_custom_prompt_from_file(doc_id)
+            elif source_file == "threads-prompts.json":
+                _delete_threads_prompt_from_file(doc_id)
             
         return {"status": "success", "message": f"Prompt {doc_id} deleted successfully."}
     except meilisearch.errors.MeilisearchApiError as exc:
